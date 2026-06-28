@@ -26,25 +26,43 @@ async function sendWA(phone, message) {
   }
 }
 
+function getPhone(order) {
+  return order.phone ||
+         order.customer?.phone ||
+         order.billing_address?.phone ||
+         order.shipping_address?.phone ||
+         null;
+}
+
 app.post('/webhook/shopify/orders/create', async (req, res) => {
   res.sendStatus(200);
-  const order = JSON.parse(req.body);
-  const phone = order.customer?.phone || order.billing_address?.phone;
-  if (!phone) return;
-  const name = order.customer?.first_name || 'عزيزتي';
-  const items = order.line_items.map(i => `• ${i.name} × ${i.quantity} — ${i.price} ${CURRENCY}`).join('\n');
-  await sendWA(phone, `✨ أهلاً بك في عالم Luchy\n\nعزيزتي ${name} 🌸\n\nتم استلام طلبك بنجاح 🎀\n\n📋 طلب #${order.order_number}\n${items}\n\n💰 الإجمالي: ${order.total_price} ${CURRENCY}\n\nسيتم التواصل معك لتأكيد التوصيل 🚚\nشكراً لاختيارك Luchy ✨`);
-  setTimeout(() => sendWA(phone, `🧾 فاتورتك من Luchy\n\nعزيزتي ${name}\n\nرقم الفاتورة: #${order.order_number}\n${items}\n\n💰 الإجمالي: ${order.total_price} ${CURRENCY}\n\nluchyline.com 🌸`), 10000);
+  try {
+    const order = JSON.parse(req.body);
+    console.log('📦 طلب جديد:', order.name);
+    const phone = getPhone(order);
+    console.log('📱 رقم الهاتف:', phone);
+    if (!phone) { console.log('⚠️ لا يوجد رقم هاتف'); return; }
+    const name = order.customer?.first_name || 'عزيزتي';
+    const items = order.line_items.map(i => `• ${i.name} × ${i.quantity} — ${i.price} ${CURRENCY}`).join('\n');
+    await sendWA(phone, `✨ أهلاً بك في عالم Luchy\n\nعزيزتي ${name} 🌸\n\nتم استلام طلبك بنجاح 🎀\n\n📋 طلب ${order.name}\n${items}\n\n💰 الإجمالي: ${order.total_price} ${CURRENCY}\n\nسيتم التواصل معك لتأكيد التوصيل 🚚\nشكراً لاختيارك Luchy ✨`);
+    setTimeout(() => sendWA(phone, `🧾 فاتورتك من Luchy\n\nعزيزتي ${name}\n\nرقم الفاتورة: ${order.name}\n${items}\n\n💰 الإجمالي: ${order.total_price} ${CURRENCY}\n\nluchyline.com 🌸`), 10000);
+  } catch (err) {
+    console.error('❌ خطأ في معالجة الطلب:', err.message);
+  }
 });
 
 app.post('/webhook/shopify/orders/fulfilled', async (req, res) => {
   res.sendStatus(200);
-  const order = JSON.parse(req.body);
-  const phone = order.customer?.phone || order.billing_address?.phone;
-  if (!phone) return;
-  const name = order.customer?.first_name || 'عزيزتي';
-  const tracking = order.fulfillments?.[0]?.tracking_number || 'سيُرسل قريباً';
-  await sendWA(phone, `🚚 طلبك في الطريق إليكِ!\n\nعزيزتي ${name} 🌸\n\nرقم الطلب: #${order.order_number}\nرقم التتبع: ${tracking}\n\nنتمنى أن تكوني أول من يرتدي إطلالتك الجديدة ✨\nLuchy 🎀`);
+  try {
+    const order = JSON.parse(req.body);
+    const phone = getPhone(order);
+    if (!phone) return;
+    const name = order.customer?.first_name || 'عزيزتي';
+    const tracking = order.fulfillments?.[0]?.tracking_number || 'سيُرسل قريباً';
+    await sendWA(phone, `🚚 طلبك في الطريق إليكِ!\n\nعزيزتي ${name} 🌸\n\nرقم الطلب: ${order.name}\nرقم التتبع: ${tracking}\n\nنتمنى أن تكوني أول من يرتدي إطلالتك الجديدة ✨\nLuchy 🎀`);
+  } catch (err) {
+    console.error('❌ خطأ:', err.message);
+  }
 });
 
 app.get('/webhook/whatsapp', (req, res) => {
